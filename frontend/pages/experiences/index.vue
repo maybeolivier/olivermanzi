@@ -3,36 +3,38 @@ import { h } from 'vue';
 import { useAuthStore } from '~/stores/auth-store';
 import { useExperienceStore } from '~/stores/experience-store';
 import { ActionItem, Experience } from '~/types';
+import { useRouterQuery } from '~/composables/useRouterQuery';
 import ExperienceCard from '~/components/cards/ExperienceCard.vue';
 
+const query = useRouterQuery();
 const authStore = useAuthStore();
 const experienceStore = useExperienceStore();
 
-const showProjects = ref<boolean>(false);
-const showEducation = ref<boolean>(false);
-const showWork = ref<boolean>(false);
 const experiences = ref<Experience[]>([]);
 const loading = ref<boolean>(false);
+
+const filter = reactive({
+	projects: false,
+	education: false,
+	work: false
+});
 
 const options = computed<ActionItem[]>(() => {
 	let base: ActionItem[] = [
 		{
 			label: 'Education',
-			color: 'education',
-			outlined: !showEducation.value,
-			action: () => { showEducation.value = !showEducation.value; }
+			color: filter.education ? 'education' : 'secondary',
+			action: () => { filter.education = !filter.education; }
 		},
 		{
 			label: 'Work',
-			color: 'job',
-			outlined: !showWork.value,
-			action: () => { showWork.value = !showWork.value; }
+			color: filter.work ? 'job' : 'secondary',
+			action: () => { filter.work = !filter.work; }
 		},
 		{
 			label: 'Projects',
-			color: 'project',
-			outlined: !showProjects.value,
-			action: () => { showProjects.value = !showProjects.value; }
+			color: filter.projects ? 'project' : 'secondary',
+			action: () => { filter.projects = !filter.projects; }
 		}
 	];
 
@@ -41,7 +43,7 @@ const options = computed<ActionItem[]>(() => {
 			...base,
 			{
 				label: 'Create xP',
-				color: 'secondary',
+				color: 'primary',
 				icon: 'mdi-plus',
 				to: '/experiences/create'
 			}
@@ -53,14 +55,14 @@ const options = computed<ActionItem[]>(() => {
 
 const getExperiences = computed<Experience[]>(() => {
 	return experiences.value.filter((experience) => {
-		if (!showEducation.value && !showProjects.value && !showWork.value) {
+		if (!filter.education && !filter.projects && !filter.work) {
 			return true;
 		} else if (experience.type === 'education') {
-			return showEducation.value;
+			return filter.education;
 		} else if (experience.type === 'job') {
-			return showWork.value;
+			return filter.work;
 		} else if (experience.type === 'project') {
-			return showProjects.value;
+			return filter.projects;
 		} else {
 			return true;
 		}
@@ -74,10 +76,57 @@ const components = computed(() => {
 	});
 });
 
+// watch filters and update the url query
+watch(
+	() => filter.education,
+	async (value) => {
+		if (value) {
+			await query.add('education', 'true');
+		} else {
+			await query.remove('education');
+		}
+	}
+);
+
+watch(
+	() => filter.work,
+	async (value) => {
+		if (value) {
+			await query.add('work', 'true');
+		} else {
+			await query.remove('work');
+		}
+	}
+);
+
+watch(
+	() => filter.projects,
+	async (value) => {
+		if (value) {
+			await query.add('projects', 'true');
+		} else {
+			await query.remove('projects');
+		}
+	}
+);
+
 onMounted(async () => {
 	loading.value = true;
 	experiences.value = await experienceStore.indexExperiences();
 	loading.value = false;
+
+	// set filters from url query
+	if (query.has('education')) {
+		filter.education = query.get('education') === 'true';
+	}
+
+	if (query.has('work')) {
+		filter.work = query.get('work') === 'true';
+	}
+
+	if (query.has('projects')) {
+		filter.projects = query.get('projects') === 'true';
+	}
 });
 
 const pageTitle = 'Experiences - oliverrr';
